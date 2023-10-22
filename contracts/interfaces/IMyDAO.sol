@@ -6,12 +6,7 @@ pragma solidity =0.8.18;
  * @author justchillinghere
  * @dev Interface for the simple DAO implementation.
  */
-
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
 interface IMyDAO {
-    // События
     event Deposited(address indexed user, uint256 amount);
     event ProposalAdded(
         uint256 indexed proposalId,
@@ -22,24 +17,59 @@ interface IMyDAO {
     event ProposalFinished(uint256 indexed proposalId, bool passed);
     event Withdrawn(address indexed user, uint256 amount);
 
-    // Функции для DAO
-
-    // Функция для депозита токенов
+    /**
+     * @dev Deposits tokens into the DAO contract.
+     *
+     * Requirements:
+     *
+     * - `amount` must be greater than 0.
+     */
     function deposit(uint256 amount) external;
 
-    // Функция для создания предложения
+    /**
+     * @dev Adds a proposal to the DAO.
+     *
+     * Requirements:
+     *
+     * - `recipient` cannot be the zero address.
+     * - `value` must be greater than 0.
+     * - `description` cannot be empty.
+     */
     function addProposal(
         address recipient,
-        uint256 value,
-        string calldata description
-    ) external returns (uint256 proposalId);
+        string calldata description,
+        bytes calldata signature
+    ) external;
 
-    // Функция для голосования
-    function vote(uint256 proposalId, bool inFavor) external;
+    /**
+     * @dev Votes for a proposal.
+     *
+     * Requirements:
+     *
+     * - `proposalId` must be a valid proposal.
+     * - `inFavor` must be true or false.
+     */
+    function vote(
+        uint256 proposalId,
+        bool isAgreed,
+        uint256 votesAmount
+    ) external;
 
-    // Функция для завершения предложения
+    /**
+     * @dev Finishes a proposal and executes the necessary actions.
+     *
+     * Requirements:
+     *
+     * - `proposalId` must be a valid proposal.
+     */
     function finishProposal(uint256 proposalId) external;
 
-    // Функция для вывода средств
-    function withdraw(uint256 amount) external;
+    /**
+     * @dev Withdraws tokens from the DAO contract.
+     *
+     * Requirements:
+     *
+     * - `amount` must be greater than 0.
+     */
+    function withdraw() external;
 }
