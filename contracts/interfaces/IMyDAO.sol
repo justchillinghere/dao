@@ -49,11 +49,7 @@ interface IMyDAO {
      * - `proposalId` must be a valid proposal.
      * - `inFavor` must be true or false.
      */
-    function vote(
-        uint256 proposalId,
-        bool isAgreed,
-        uint256 votesAmount
-    ) external;
+    function vote(uint256 proposalId, bool isAgreed) external;
 
     /**
      * @dev Finishes a proposal and executes the necessary actions.

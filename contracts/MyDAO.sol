@@ -23,16 +23,17 @@ contract MyDAO is IMyDAO, AccessControl {
 
     struct User {
         uint256 votesAvailable;
-        mapping(uint256 proposalId => uint256 amount) votesLocked;
+        uint256[] activeDebates; // here we store ids of debates that user has locked votes in
     }
     struct Proposal {
         address proposer;
         string description;
         address recipient; // Can be used for various purposes, such as target contracts
         bytes data; // Any additional data or parameters related to the proposal
-        address[] voters; // List of voters
+        mapping(address => uint256) voters; // Map of voters to their votes
         mapping(bool isAgreed => uint) votesCount; // Count of Agreed(1)/Disagreed(0) values
         uint256 startedAt;
+        uint256 votersCount;
         bool finished;
     }
 
@@ -75,14 +76,14 @@ contract MyDAO is IMyDAO, AccessControl {
         emit Deposited(msg.sender, amount);
     }
 
-    function vote(
-        uint256 proposalId,
-        bool isAgreed,
-        uint256 votesAmount
-    ) external {
+    function vote(uint256 proposalId, bool isAgreed) external {
         require(
-            users[msg.sender].votesAvailable > votesAmount,
+            users[msg.sender].votesAvailable > 0,
             "Insufficient tokens to vote"
+        );
+        require(
+            proposals[proposalId].voters[msg.sender] == 0,
+            "User has already voted for this proposal"
         );
         require(proposals[proposalId].startedAt > 0, "Invalid proposalId");
         require(
@@ -91,21 +92,14 @@ contract MyDAO is IMyDAO, AccessControl {
             "Voting period has ended"
         );
 
+        users[msg.sender].activeDebates.push(proposalId);
         Proposal storage proposal = proposals[proposalId];
-        users[msg.sender].votesAvailable -= votesAmount;
-        users[msg.sender].votesLocked[proposalId] += votesAmount;
-        proposal.voters.push(msg.sender);
-        proposal.votesCount[isAgreed] += votesAmount;
-        emit Voted(msg.sender, proposalId, isAgreed);
-    }
-
-    function _unlockVotes(uint256 proposalId) internal {
-        for (uint256 i = 0; i < proposals[proposalId].voters.length; i++) {
-            address voter = proposals[proposalId].voters[i];
-            uint256 votesAmount = users[voter].votesLocked[proposalId];
-            users[voter].votesLocked[proposalId] = 0;
-            users[voter].votesAvailable += votesAmount;
+        proposal.voters[msg.sender] = users[msg.sender].votesAvailable;
+        proposal.votesCount[isAgreed] += users[msg.sender].votesAvailable;
+        unchecked {
+            proposal.votersCount++;
         }
+        emit Voted(msg.sender, proposalId, isAgreed);
     }
 
     function _callContract(address recipient, bytes memory signature) internal {
@@ -116,7 +110,7 @@ contract MyDAO is IMyDAO, AccessControl {
     function finishProposal(uint256 proposalId) external {
         require(proposals[proposalId].startedAt > 0, "Invalid proposalId");
         require(
-            users[msg.sender].votesLocked[proposalId] > 0 ||
+            users[msg.sender].votesAvailable > 0 ||
                 hasRole(CHAIRPERSON_ROLE, msg.sender),
             "You cannot finish this proposal"
         );
@@ -131,7 +125,7 @@ contract MyDAO is IMyDAO, AccessControl {
             "Proposal has already been finished"
         );
         require(
-            proposalToFinish.voters.length >= minQuorum,
+            proposalToFinish.votersCount >= minQuorum,
             "Quorum has not been reached"
         );
 
@@ -146,7 +140,29 @@ contract MyDAO is IMyDAO, AccessControl {
             proposalToFinish.finished = true;
             emit ProposalFinished(proposalId, false);
         }
-        _unlockVotes(proposalId);
+    }
+
+    function _getActiveDebates(
+        address user
+    ) internal view returns (uint256[] memory) {
+        uint256[] memory newActiveDebates = new uint256[](
+            users[user].activeDebates.length
+        );
+        uint256 counter = 0;
+        for (uint256 i = 0; i < users[user].activeDebates.length; i++) {
+            uint256 proposalId = users[user].activeDebates[i];
+            if (!proposals[proposalId].finished) {
+                newActiveDebates[counter] = proposalId;
+                counter++;
+            }
+        }
+
+        uint256[] memory finalActiveDebates = new uint256[](counter);
+        for (uint256 i = 0; i < counter; i++) {
+            finalActiveDebates[i] = newActiveDebates[i];
+        }
+
+        return finalActiveDebates;
     }
 
     function withdraw() external {
@@ -154,9 +170,20 @@ contract MyDAO is IMyDAO, AccessControl {
             users[msg.sender].votesAvailable > 0,
             "You have no votes to withdraw"
         );
+
+        uint256[] memory _activeDebates = _getActiveDebates(msg.sender);
+        users[msg.sender].activeDebates = _activeDebates;
+
+        require(
+            users[msg.sender].activeDebates.length == 0,
+            "You have active debates"
+        );
+
         uint256 amount = users[msg.sender].votesAvailable;
         users[msg.sender].votesAvailable = 0;
+
         govToken.transfer(msg.sender, amount);
+
         emit Withdrawn(msg.sender, amount);
     }
 }
