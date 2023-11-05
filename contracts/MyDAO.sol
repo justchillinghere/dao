@@ -55,7 +55,7 @@ contract MyDAO is IMyDAO, AccessControl {
     function addProposal(
         address recipient,
         string calldata description,
-        bytes calldata signature
+        bytes calldata data
     ) external onlyRole(CHAIRPERSON_ROLE) {
         unchecked {
             _proposalIdCounter++;
@@ -63,7 +63,7 @@ contract MyDAO is IMyDAO, AccessControl {
         Proposal storage newProposal = proposals[_proposalIdCounter];
         newProposal.proposer = msg.sender;
         newProposal.description = description;
-        newProposal.data = signature;
+        newProposal.data = data;
         newProposal.startedAt = block.timestamp;
 
         emit ProposalAdded(_proposalIdCounter, recipient, description);
@@ -76,20 +76,26 @@ contract MyDAO is IMyDAO, AccessControl {
         emit Deposited(msg.sender, amount);
     }
 
+    function getAvailableVotes(address user) public view returns (uint256) {
+        return users[user].votesAvailable;
+    }
+
     function vote(uint256 proposalId, bool isAgreed) external {
         require(
             users[msg.sender].votesAvailable > 0,
-            "Insufficient tokens to vote"
+            "MyDAO: Not enough votes"
         );
         require(
             proposals[proposalId].voters[msg.sender] == 0,
-            "User has already voted for this proposal"
+            "MyDAO: User has already voted for this proposal"
         );
-        require(proposals[proposalId].startedAt > 0, "Invalid proposalId");
         require(
-            block.timestamp <
-                proposals[proposalId].startedAt + minProposalDuration,
-            "Voting period has ended"
+            proposals[proposalId].startedAt > 0,
+            "MyDAO: Invalid proposalId"
+        );
+        require(
+            !proposals[proposalId].finished,
+            "MyDAO: Voting period has ended"
         );
 
         users[msg.sender].activeDebates.push(proposalId);
@@ -104,29 +110,31 @@ contract MyDAO is IMyDAO, AccessControl {
 
     function _callContract(address recipient, bytes memory signature) internal {
         (bool success, ) = recipient.call{value: 0}(signature);
-        require(success, "Call failed");
+        require(success, "MyDAO: Call failed");
     }
 
     function finishProposal(uint256 proposalId) external {
-        require(proposals[proposalId].startedAt > 0, "Invalid proposalId");
         require(
-            users[msg.sender].votesAvailable > 0 ||
-                hasRole(CHAIRPERSON_ROLE, msg.sender),
-            "You cannot finish this proposal"
+            proposals[proposalId].startedAt > 0,
+            "MyDAO: Invalid proposalId"
+        );
+        require(
+            hasRole(CHAIRPERSON_ROLE, msg.sender),
+            "MyDAO: You cannot finish this proposal"
         );
 
         Proposal storage proposalToFinish = proposals[proposalId];
         require(
             block.timestamp > proposalToFinish.startedAt + minProposalDuration,
-            "Voting period has not ended yet"
+            "MyDAO: Voting period has not ended yet"
         );
         require(
             !proposalToFinish.finished,
-            "Proposal has already been finished"
+            "MyDAO: Proposal has already been finished"
         );
         require(
             proposalToFinish.votersCount >= minQuorum,
-            "Quorum has not been reached"
+            "MyDAO: Quorum has not been reached"
         );
 
         if (
@@ -168,7 +176,7 @@ contract MyDAO is IMyDAO, AccessControl {
     function withdraw() external {
         require(
             users[msg.sender].votesAvailable > 0,
-            "You have no votes to withdraw"
+            "MyDAO: You have no votes to withdraw"
         );
 
         uint256[] memory _activeDebates = _getActiveDebates(msg.sender);
@@ -176,7 +184,7 @@ contract MyDAO is IMyDAO, AccessControl {
 
         require(
             users[msg.sender].activeDebates.length == 0,
-            "You have active debates"
+            "MyDAO: You have active debates"
         );
 
         uint256 amount = users[msg.sender].votesAvailable;

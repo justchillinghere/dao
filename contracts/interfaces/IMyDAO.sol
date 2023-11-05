@@ -26,6 +26,8 @@ interface IMyDAO {
      */
     function deposit(uint256 amount) external;
 
+    function getAvailableVotes(address user) external view returns (uint256);
+
     /**
      * @dev Adds a proposal to the DAO.
      *

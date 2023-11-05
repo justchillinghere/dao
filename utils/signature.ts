@@ -30,3 +30,16 @@ export function splitSignature(signature: string): {
 } {
   return ethers.utils.splitSignature(signature);
 }
+
+export function encodeFunctionCall(
+  functionName: string,
+  types: Array<string>,
+  args: Array<string | number>
+): string {
+  const functionSignature = `${functionName}(${types.join(",")})`;
+  const functionSelector = ethers.utils.id(functionSignature).slice(0, 10);
+  const encodedArgs = ethers.utils.defaultAbiCoder.encode(types, args);
+  const data = functionSelector + encodedArgs.slice(2);
+
+  return data;
+}
