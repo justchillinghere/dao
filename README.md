@@ -2,7 +2,7 @@
 
 ## Description
 
-TEST The MyICO contract is a custom ICO (Initial Coin Offering) contract. It allows users to purchase tokens using USD and claim their tokens at a later time. Here are the important details of the contract:
+TEST test 222 The MyICO contract is a custom ICO (Initial Coin Offering) contract. It allows users to purchase tokens using USD and claim their tokens at a later time. Here are the important details of the contract:
 
 - The contract has an `initialize` function that can only be called by the admin role to set the start times for buying and claiming tokens.
 - The contract has a `buyToken` function that allows users to purchase tokens using USD. The function converts the USD amount to TST tokens based on the exchange rate and checks if the user's balance is within the allowed range.
